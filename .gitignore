@@ -6,3 +6,5 @@ __pycache__/
 shared/
 venv/
 *.log
+.vscode
+.dockerignore
