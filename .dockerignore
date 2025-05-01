@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.parquet
+*.csv
+*.log
+.dag-dependencies/
+node_modules/
+data/
+venv/
+.env
+.idea/
+.git/
