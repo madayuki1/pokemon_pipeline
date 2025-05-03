@@ -1,4 +1,3 @@
-from airflow import DAG
 from airflow.decorators import task, dag
 from airflow.utils.task_group import TaskGroup
 from datetime import datetime, timedelta 
@@ -6,7 +5,6 @@ from zoneinfo import ZoneInfo
 import sys
 import os
 import requests
-import pandas as pd
 
 sys.path.append(os.path.abspath("/opt/airflow/include"))
 # sys.path.append(os.path.abspath("../include"))

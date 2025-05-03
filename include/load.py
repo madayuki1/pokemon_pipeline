@@ -8,8 +8,9 @@ BASE_PATH = "/shared/poke_api"
 POKEMON_TABLE = f"{BASE_PATH}/pokemon"
 TYPE_TABLE = f"{BASE_PATH}/type"
 ABILITY_TABLE = f"{BASE_PATH}/ability"
+MOVE_TABLE = f"{BASE_PATH}/move"
 
-TABLES = {"pokemon": POKEMON_TABLE, "type": TYPE_TABLE, "ability": ABILITY_TABLE}
+TABLES = {"pokemon": POKEMON_TABLE, "type": TYPE_TABLE, "ability": ABILITY_TABLE, "move": MOVE_TABLE}
 
 
 class DataLoader:
@@ -63,19 +64,3 @@ class DataLoader:
         except Exception as e:
             print(f"Failed to retrieve parquet files in get_ids: {e}")
             return pd.Series(dtype=int)
-
-        # try:
-        #     query = f"""
-        #             SELECT *
-        #             FROM read_parquet('{path}/*.parquet')
-        #         """
-        #     results = self.conn.execute(query).fetchdf()
-
-        #     if not results.empty:
-        #         return results['id']
-        #     else:
-        #         print("Failed to retrive parquet file")
-        #         return pd.Series(dtype=int)
-        # except Exception as e:
-        #         print(f"Failed to retrive parquet file: {e}")
-        #         return pd.Series(dtype=int)

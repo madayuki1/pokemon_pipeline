@@ -1,14 +1,14 @@
-from typing import List
-from pandas import DataFrame, to_datetime
+from typing import List, Union
+from pandas import DataFrame
 from datetime import datetime
-import os
 import pandas as pd
-import json
+from zoneinfo import ZoneInfo
 
-from extract import *
-
-def create_dataframe(data: List[dict]) -> DataFrame:
-    return DataFrame(data)
+def create_dataframe(data: Union[List[dict], DataFrame]) -> DataFrame:
+    df = DataFrame(data)
+    if df.empty:
+        return DataFrame()
+    return df
 
 def to_datetime(date_string: str) -> str:
     date_format = [
@@ -22,6 +22,7 @@ def to_datetime(date_string: str) -> str:
             return parsed_date.isoformat()
         except ValueError:
             continue
+
 def save_list_to_csv(data: list, filename="output.csv"):
     """
     Saves a list of JSON objects (dicts) to a CSV file.
@@ -43,3 +44,31 @@ def save_list_to_csv(data: list, filename="output.csv"):
         print(f"Data saved to {filename}")
     except Exception as e:
         print(f"Error saving list to CSV: {e}")
+
+def add_timestamp(data: pd.DataFrame)-> pd.DataFrame:
+    current_time = datetime.now(ZoneInfo("Asia/Singapore"))
+    df = (
+        data.assign(created_at=current_time)
+        .assign(updated_at=current_time)
+    )
+    return df     
+
+def validate_columns(
+    data: DataFrame, 
+    column_to_check: List[str], 
+    context: str = "use",
+    caller_frame=None)-> None:
+    
+    missing = [col for col in column_to_check if col not in data.columns]
+    if not missing:
+        return
+
+    if caller_frame:
+        class_name = caller_frame.f_locals.get('self').__class__.__name__
+        method_name = caller_frame.f_code.co_name
+        error_prefix = f"[{class_name}.{method_name}]"
+    else:
+        error_prefix = "[Validation]"
+    
+    action = 'Required' if context == 'use' else 'Droppable'
+    raise ValueError(f'{error_prefix}; {action} columns missing: {missing}')

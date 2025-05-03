@@ -1,13 +1,10 @@
 import requests
 import data_classes as dc
-from dataclasses import dataclass, fields, MISSING
+from dataclasses import dataclass, fields
 from typing import List
 import json
-from transform import *
-from app_utils import *
 import pandas as pd
-import pprint
-import load
+from load import DataLoader, TABLES
 
 BASE_URL = "https://pokeapi.co/api/v2"
 
@@ -27,7 +24,7 @@ class ApiRequest:
         ids = table.get_ids(path=TABLES[f"{dataclass_name.__name__.lower()}"])
         ids = set(int(i) for i in ids)
         # print(f'existing ids: {ids}')
-        print(f'url use in ability {url}')
+        print(f'url use in {self.endpoint} {url}')
 
         response = requests.Session().get(url).json()
         results = response.get("results")
@@ -50,10 +47,14 @@ class ApiRequest:
             }
 
             # filter detail_response to only provided key:value of the dataclass field
-            filtered_response = {
-                key: detail_response.get(key, default)
-                for key, default in dataclass_fields.items()
-            }
+            filtered_response = {}
+            for key, default in dataclass_fields.items():
+                value = detail_response.get(key, default)
+
+                if isinstance(value, (list, dict)):
+                    value = json.dumps(value)
+                
+                filtered_response[key] = value
 
             dataclass_results = dataclass_name(**filtered_response)
             data.append(dataclass_results)  
