@@ -2,60 +2,48 @@ import pandas as pd
 import os
 import duckdb
 import glob
-
-BASE_PATH = "/shared/poke_api"
-
-POKEMON_TABLE = f"{BASE_PATH}/pokemon"
-TYPE_TABLE = f"{BASE_PATH}/type"
-ABILITY_TABLE = f"{BASE_PATH}/ability"
-MOVE_TABLE = f"{BASE_PATH}/move"
-
-TABLES = {"pokemon": POKEMON_TABLE, "type": TYPE_TABLE, "ability": ABILITY_TABLE, "move": MOVE_TABLE}
-
+from pathlib import Path
+from zoneinfo import ZoneInfo
+from datetime import datetime
 
 class DataLoader:
-    def __init__(self, dbname: str = "data"):
-        self.conn = duckdb.connect(f"/shared/poke_api/{dbname}.duckdb")
+    def __init__(self, path: str, layer: str = "data"):
+        self.path = path
+        self.layer = layer
 
-    def save_parquet(self, df: pd.DataFrame, path: str, filename: str):
+    def save_parquet(self, df: pd.DataFrame, table_name:str, filename: str=''):
         if df.empty:
             return 
         
-        os.makedirs(path, exist_ok=True)
-        fullpath = os.path.join(path, f"{filename}.parquet")
-        # Register the dataframe
-        df.to_parquet(fullpath, index=False, compression='snappy')
-        # self.conn.register("temp_df", df)
-        # self.conn.query(f"""
-        #         COPY temp_df TO '{fullpath}'
-        #         (FORMAT PARQUET, COMPRESSION 'SNAPPY', OVERWRITE 1)
-        #     """)
-        # self.conn.unregister("temp_df")
+        now = datetime.now(ZoneInfo("Asia/Singapore"))
+        if filename == '':
+            filename = f'{table_name}_{now.strftime("%Y-%m-%d__%H-%M-%S")}.parquet'
+        else:
+            filename = f'{filename}.parquet'
 
-    def read_parquet(self, path: str, prefix: str = '') -> pd.DataFrame:
-        pattern = os.path.join(path, f'{prefix}*.parquet')
-        parquet_files = glob.glob(pattern)
+        table_path = Path(self.path) / self.layer
+        os.makedirs(table_path, exist_ok=True)
+
+        file_path = table_path / filename
+        df.to_parquet(file_path, index=False, compression='snappy')
+
+    def read_parquet(self, table_name) -> pd.DataFrame:
+        pattern = Path(self.path) / self.layer / f'{table_name}*.parquet'
+        parquet_files = glob.glob(str(pattern))
 
         if not parquet_files:
+            print(f"Resolved base: {Path(self.path).resolve()}")
+            print(f"Pattern used: {pattern}")
+            print(f"Matching files: {glob.glob(str(pattern))}")
             print('No parquet files found')
             return pd.DataFrame()
         
         df_list = [pd.read_parquet(file) for file in parquet_files]
         return pd.concat(df_list, ignore_index=True)
-        # return self.conn.execute(f"SELECT * FROM '{path}/{prefix}*.parquet'").df()
 
-    def get_ids(self, path: str, prefix: str = ''):
-        # Check if any parquet files exist
-        pattern = os.path.join(path, f'{prefix}*.parquet')
-        parquet_files = glob.glob(pattern)
-        if not parquet_files:
-            print("No parquet files found in path.")
-            return pd.Series(dtype=int)
-        
+    def get_ids(self, table_name):
         try:
-            df_list = [pd.read_parquet(file) for file in parquet_files]
-            full_df = pd.concat(df_list, ignore_index=True)
-
+            full_df = self.read_parquet(table_name)
             if 'id' in full_df.columns:
                 return full_df['id']
             else:

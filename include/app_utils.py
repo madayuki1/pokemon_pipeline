@@ -3,6 +3,10 @@ from pandas import DataFrame
 from datetime import datetime
 import pandas as pd
 from zoneinfo import ZoneInfo
+from pathlib import Path
+from typing import Type
+import importlib
+import json
 
 def create_dataframe(data: Union[List[dict], DataFrame]) -> DataFrame:
     df = DataFrame(data)
@@ -53,6 +57,15 @@ def add_timestamp(data: pd.DataFrame)-> pd.DataFrame:
     )
     return df     
 
+def get_short_effect_en(effect_entries_string:str):
+    try:
+        entries = json.loads(effect_entries_string)
+        for entry in entries:
+            if entry.get('language', {}).get('name') == 'en':
+                return entry.get('short_effect')
+    except (json.JSONDecodeError, TypeError):
+        return None
+
 def validate_columns(
     data: DataFrame, 
     column_to_check: List[str], 
@@ -72,3 +85,13 @@ def validate_columns(
     
     action = 'Required' if context == 'use' else 'Droppable'
     raise ValueError(f'{error_prefix}; {action} columns missing: {missing}')
+
+def get_config(config_name: str) -> Path:
+    return  Path(__file__).parent.parent / "config" / f"{config_name}"
+
+def get_class(classname: str, module: str) -> Type:
+    module_name = importlib.import_module(module)
+    try:
+        return getattr(module_name, classname)
+    except AttributeError:
+        raise ValueError(f'Class {classname} not found in module {module_name}')

@@ -1,0 +1,17 @@
+silver_etl_plan:
+    type:
+        class: "Type"
+        return_multiple: False
+        dependencies: []
+    move:
+        class: "Move"
+        return_multiple: False
+        dependencies: ["type"] 
+    ability:
+        class: "Ability"
+        return_multiple: False
+        dependencies: ["move"] 
+    pokemon:
+        class: "Pokemon"
+        return_multiple: True
+        dependencies: ["ability"]

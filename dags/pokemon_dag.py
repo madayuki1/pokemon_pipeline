@@ -1,20 +1,23 @@
 from airflow.decorators import task, dag
 from airflow.utils.task_group import TaskGroup
 from datetime import datetime, timedelta 
-from zoneinfo import ZoneInfo
 import sys
-import os
 import requests
+from pathlib import Path
+import yaml
+import duckdb
+from jinja2 import Template
 
-sys.path.append(os.path.abspath("/opt/airflow/include"))
-# sys.path.append(os.path.abspath("../include"))
+sys.path.append(str((Path(__file__).parent.parent / "include").resolve()))
 
-from extract import POKEMON_ENDPOINTS, TYPE_ENDPOINTS, ABILITY_ENDPOINTS, ApiRequest, BASE_URL
-from transform import TypeTransformation, AbilityTransformation, PokemonTransformation
-from load import DataLoader, TABLES
-from data_classes import Pokemon, Type, Ability
+from extract import  ApiRequest
+from load import DataLoader
+from app_utils import get_config, get_class
 
 dag_owner = 'madayuki'
+current_path = Path(__file__).resolve()
+root_path = current_path.parents[3]
+data_path = root_path / 'shared' / 'poke_api'
 
 default_args = {
         'owner': dag_owner,
@@ -42,36 +45,29 @@ def pokeapi_pipeline():
         else:
             raise ValueError(f"API not reached, status code = {response.status_code}")
 
-    def extract_and_load_bronze_data(endpoint, dataclass_instance, path):
-        bronze_loader = DataLoader('bronze')
-        url = f'{BASE_URL}/{endpoint}'
+    def extract_and_load_bronze_data(table_name, endpoint, dataclass_instance, call_mode, batch_size):
+        bronze_loader = DataLoader(data_path, 'bronze')
         
         def single_call(endpoint, dataclass_instance):
-            now = datetime.now(ZoneInfo("Asia/Singapore"))
-            filename = f'bronze_{now.strftime("%Y-%m-%d__%H-%M-%S")}'
-            data = ApiRequest(url).extractData(dataclass_instance)
-            transformed_data = TypeTransformation(data).bronze()
-            bronze_loader.save_parquet(transformed_data, path, filename)
+            data = ApiRequest(endpoint).extractData(data_path, dataclass_instance)
+            transformation_class = get_class(f'{dataclass_instance.__name__}Transformation', 'transform')
+            transformed_data = transformation_class(data).bronze()
+            bronze_loader.save_parquet(transformed_data, table_name)
         
-        def batch_call(endpoint, dataclass_instance):
+        def batch_call(endpoint, dataclass_instance, batch_size):
             offset = 0
-            batch_size = 200
 
             print(f"Starting batch call for {endpoint}.")
             while True:
-                batch_data = ApiRequest(url).extractData(dataclass_instance, offset=offset, limit=batch_size)
-                now = datetime.now(ZoneInfo("Asia/Singapore"))
-                filename = f'bronze_{now.strftime("%Y-%m-%d__%H-%M-%S")}'
+                batch_data = ApiRequest(endpoint).extractData(data_path, dataclass_instance, offset=offset, limit=batch_size)
 
                 if not batch_data:
                     print("No more data found. Ending batch.")
                     break
 
-                if endpoint == POKEMON_ENDPOINTS:
-                    transformed_batch = PokemonTransformation(batch_data).bronze()
-                elif endpoint == ABILITY_ENDPOINTS:
-                    transformed_batch = AbilityTransformation(batch_data).bronze()
-                bronze_loader.save_parquet(transformed_batch, path, filename)
+                transformation_class = get_class(f'{dataclass_instance.__name__}Transformation', 'transform')
+                transformed_batch = transformation_class(batch_data).bronze()
+                bronze_loader.save_parquet(transformed_batch, table_name)
 
                 if len(batch_data) < batch_size:
                     print("Last batch received. Ending batch.")
@@ -80,70 +76,98 @@ def pokeapi_pipeline():
                 offset = offset + batch_size
             print(f"Finished batch call for {endpoint}.")
         
-        @task(task_id=f'Extract_{endpoint}')
+        @task(task_id=f'Extract_{dataclass_instance.__name__}')
         def extract_data():
-            if endpoint == TYPE_ENDPOINTS:
+            print(f'this le path{data_path}')
+            if call_mode == 'single':
                 single_call(endpoint, dataclass_instance)
-            elif endpoint in [ABILITY_ENDPOINTS, POKEMON_ENDPOINTS]:
-                batch_call(endpoint, dataclass_instance)
+            elif call_mode == 'batch':
+                batch_call(endpoint, dataclass_instance, batch_size)
 
         return extract_data()
 
-    def transform_and_load_silver_data(table):
-        label = table.split('/')[-1]
-        bronze_loader = DataLoader('bronze')
-        silver_loader = DataLoader('silver')
+    def transform_and_load_silver_data(table_name, class_name: str, return_multiple: bool = False):
+        bronze_loader = DataLoader(data_path, 'bronze')
+        silver_loader = DataLoader(data_path, 'silver')
 
-        @task(task_id = f'Transform_{label}')
+        @task(task_id = f'Transform_{table_name}')
         def transform_data():
-            now = datetime.now(ZoneInfo("Asia/Singapore"))
-            bronze_data = bronze_loader.read_parquet(table, 'bronze')
-            if table == TABLES['type']:
-                df_silver_data = TypeTransformation(bronze_data).silver()
-            elif table == TABLES['ability']:
-                df_silver_data = AbilityTransformation(bronze_data).silver()
-            elif table == TABLES['pokemon']:
-                df_silver_data = PokemonTransformation(bronze_data).silver()    
-            silver_loader.save_parquet(df_silver_data, table, f'silver_{now.strftime("%Y-%m-%d__%H-%M-%S")}')
+            bronze_data = bronze_loader.read_parquet(table_name)
+            transformation_class = get_class(f'{class_name}Transformation', 'transform')
+            if return_multiple:
+                for name, df in transformation_class(bronze_data).silver():
+                    silver_loader.save_parquet(df, name, filename=name)
+            else:
+                silver_data = transformation_class(bronze_data).silver()    
+                silver_loader.save_parquet(silver_data, table_name, filename=table_name)
 
         return transform_data()
 
-    def transform_and_load_gold_data(table):
-        label = table.split('/')[-1]
-        silver_loader = DataLoader('silver')
-        gold_loader = DataLoader('gold')
+    def transform_and_load_gold_data(table_name, query_path: str = ''):
+        gold_loader = DataLoader(data_path, 'gold')
+        con = duckdb.connect(data_path / 'gold.duckdb')
 
-        @task(task_id=f'Transform_{label}')
+        @task(task_id=f'Transform_{table_name}')
         def transform_data():
-            now = datetime.now(ZoneInfo("Asia/Singapore"))
-            silver_data = silver_loader.read_parquet(table, 'silver')
+            
+            sql_path = current_path.parents[1] / query_path
+            # Read the SQL file content as string
+            sql_str = sql_path.read_text() 
 
-            if table == TABLES['type']:
-                gold_data = TypeTransformation(silver_data).gold()
-            elif table == TABLES['ability']:
-                gold_data = AbilityTransformation(silver_data).gold()
-            elif table == TABLES['pokemon']:
-                gold_data = PokemonTransformation(silver_data).gold()
-            gold_loader.save_parquet(gold_data, table, f'gold_{now.strftime("%Y-%m-%d__%H-%M-%S")}')
+            query = Template(sql_str).render(silver_path = str(data_path / 'silver'))
+            gold_data = con.execute(query).fetchdf()
+            gold_loader.save_parquet(gold_data, table_name, filename=table_name)
         return transform_data()
 
     with TaskGroup("Bronze_Layer") as bronze_group:
-        bronze_type = extract_and_load_bronze_data(TYPE_ENDPOINTS, Type, TABLES['type'])
-        bronze_ability = extract_and_load_bronze_data(ABILITY_ENDPOINTS, Ability, TABLES['ability'])
-        bronze_pokemon = extract_and_load_bronze_data(POKEMON_ENDPOINTS, Pokemon, TABLES['pokemon'])
-        bronze_type >> bronze_ability >> bronze_pokemon
+        
+        bronze_config = yaml.safe_load(
+            get_config('bronze_etl_plan.yml').read_text())['bronze_etl_plan']
+        tasks = {}
+
+        for name, params in bronze_config.items():
+            tasks[name] = extract_and_load_bronze_data(
+                table_name = name,
+                endpoint=params['endpoint'],
+                dataclass_instance=get_class(params['class'], 'data_classes'),
+                call_mode=params['call_mode'],
+                batch_size=params['batch_size']
+            )
+
+        for name, params in bronze_config.items():
+            for dependencies in params.get('dependencies', []):
+                if dependencies not in tasks:
+                    continue
+                tasks[dependencies] >> tasks[name]
 
     with TaskGroup('Silver_Layer') as silver_group:
-        silver_type =transform_and_load_silver_data(TABLES['type'])
-        silver_ability =transform_and_load_silver_data(TABLES['ability'])
-        silver_pokemon =transform_and_load_silver_data(TABLES['pokemon'])
-        silver_type >> silver_ability >> silver_pokemon
+        silver_config = yaml.safe_load(
+            get_config('silver_etl_plan.yml').read_text())['silver_etl_plan']
+        for name, params in silver_config.items():
+            tasks[name] = transform_and_load_silver_data(
+                table_name = name,
+                class_name=params['class'],
+                return_multiple=params['return_multiple']
+            )
+        for name, params in silver_config.items():
+            for dependencies in params.get('dependencies', []):
+                if dependencies not in tasks:
+                    continue
+                tasks[dependencies] >> tasks[name]
     
     with TaskGroup('Gold_Layer') as gold_group:
-        gold_type =transform_and_load_gold_data(TABLES['type'])
-        gold_ability =transform_and_load_gold_data(TABLES['ability'])
-        gold_pokemon =transform_and_load_gold_data(TABLES['pokemon'])
-        gold_type >> gold_ability >> gold_pokemon
+        gold_config = yaml.safe_load(
+            get_config('gold_etl_plan.yml').read_text())['gold_etl_plan']
+        for name, params in gold_config.items():
+            tasks[name] = transform_and_load_gold_data(
+                table_name=name,
+                query_path= current_path.parents[1] / params['query_path']
+            )
+        for name, params in gold_config.items():
+            for dependencies in params.get('dependencies', []):
+                if dependencies not in tasks:
+                    continue
+                tasks[dependencies] >> tasks[name]
 
     (
         check_api_response()

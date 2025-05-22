@@ -1,0 +1,4 @@
+gold_etl_plan:
+    pokemon_types:
+        query_path: 'include/sql/pokemon_types.sql'
+        dependencies: []
