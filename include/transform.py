@@ -119,12 +119,14 @@ class PokemonTransformation:
         pokemon_moves = []
         pokemon_abilities = []
         pokemon_types = []
+        pokemon_stats = []
 
         for _, row in pokemon_df.iterrows():
             pokemon_id = row['id']
             types = json.loads(row['types']) if isinstance(row['types'], str) else row['types']
             moves = json.loads(row['moves']) if isinstance(row['moves'], str) else row['moves']
             abilities = json.loads(row['abilities'] if isinstance(row['abilities'], str) else row['abilities'])
+            stats = json.loads(row['stats'] if isinstance(row['stats'], str) else row['stats'])
 
             for type in types:
                 type_url = type['type']['url']
@@ -149,15 +151,31 @@ class PokemonTransformation:
                     'pokemon_id': pokemon_id,
                     'ability_id': ability_id
                 })
+
+            for stat in stats:
+                stat_name = stat['stat']['name']
+                base_stat = stat['base_stat']
+                effort = stat['effort']
+                pokemon_stats.append({
+                    'pokemon_id': pokemon_id,
+                    'stat_name': stat_name,
+                    'base_stat' : base_stat,
+                    'effort' : effort,
+                })
+
+            
         pokemon_df = pokemon_df.drop(columns=['types', 'moves', 'abilities'])
 
         pokemon_types_df = pd.DataFrame(pokemon_types)
         pokemon_moves_df = pd.DataFrame(pokemon_moves)
         pokemon_abilities_df = pd.DataFrame(pokemon_abilities)
+        pokemon_stats_df = pd.DataFrame(pokemon_stats)
+
         yield 'pokemon', pokemon_df
         yield 'pokemon_types', pokemon_types_df
         yield 'pokemon_moves', pokemon_moves_df
         yield 'pokemon_abilities', pokemon_abilities_df
+        yield 'pokemon_stats', pokemon_stats_df
 
     def gold(self):
         df = self.data.drop(columns=["created_at", "updated_at"]).rename(

@@ -114,7 +114,13 @@ def pokeapi_pipeline():
             # Read the SQL file content as string
             sql_str = sql_path.read_text() 
 
-            query = Template(sql_str).render(silver_path = str(data_path / 'silver'))
+            jinja_params = {
+                'bronze_path' : str(data_path / 'bronze'),
+                'silver_path' : str(data_path / 'silver'),
+                'gold_path' : str(data_path / 'gold')
+            }
+
+            query = Template(sql_str).render(**jinja_params)
             gold_data = con.execute(query).fetchdf()
             gold_loader.save_parquet(gold_data, table_name, filename=table_name)
         return transform_data()
