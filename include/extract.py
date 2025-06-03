@@ -8,11 +8,11 @@ class ApiRequest:
     def __init__(self, endpoint: str):
         self.endpoint = endpoint
 
-    def extractData(self, path: str, dataclass_name: dataclass, offset: int = 0, limit: int = 20) -> List[dict]:
+    def extractData(self, path: str, table_name: str, dataclass_name: dataclass, offset: int = 0, limit: int = 20) -> List[dict]:
         data = []
         url = f"{self.endpoint}?offset={offset}&limit={limit}"
         table = DataLoader(path, "bronze")
-        ids = table.get_ids(dataclass_name.__name__.lower())
+        ids = table.get_ids(table_name.lower())
         if not ids.empty: 
             ids = set(int(i) for i in ids)
 

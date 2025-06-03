@@ -3,7 +3,17 @@ import pandas as pd
 import inspect
 import json
 
-from app_utils import create_dataframe, add_timestamp, validate_columns, get_short_effect_en
+from app_utils import (
+    create_dataframe,
+    add_timestamp,
+    validate_columns,
+    get_short_effect_en,
+    get_generation,
+    get_species,
+    get_type,
+    get_dict_key,
+)
+
 
 class TypeTransformation:
     def __init__(self, data: Union[List[dict], pd.DataFrame]):
@@ -18,12 +28,10 @@ class TypeTransformation:
         try:
             col_to_drop = ["generation", "game_indices", "names", "moves", "pokemon"]
             validate_columns(
-                df, 
-                col_to_drop, 
-                context='drop',
-                caller_frame=inspect.currentframe())
+                df, col_to_drop, context="drop", caller_frame=inspect.currentframe()
+            )
 
-            df = df.drop(columns=["generation", "game_indices", "names", "moves", "pokemon"])
+            df = df.drop(columns=col_to_drop)
         except ValueError as e:
             print(e)
         return df
@@ -33,7 +41,8 @@ class TypeTransformation:
             columns={"id": "type_id"}
         )
         return df
-    
+
+
 class MoveTransformation:
     def __init__(self, data: Union[List[dict], pd.DataFrame]):
         self.data = data
@@ -47,12 +56,12 @@ class MoveTransformation:
         try:
             col_to_drop = ["generation"]
             validate_columns(
-                df, 
-                col_to_drop, 
-                context='drop',
-                caller_frame=inspect.currentframe())
+                df, col_to_drop, context="drop", caller_frame=inspect.currentframe()
+            )
+            df['damage_class'] = df['damage_class'].apply(lambda x: get_dict_key(x, 'name'))
+            df['type'] = df['type'].apply(lambda x: get_dict_key(x, 'name'))
 
-            df = df.drop(columns=["generation"])
+            df = df.drop(columns=col_to_drop)
         except ValueError as e:
             print(e)
         return df
@@ -62,6 +71,7 @@ class MoveTransformation:
             columns={"id": "move_id"}
         )
         return df
+
 
 class AbilityTransformation:
     def __init__(self, data: Union[List[dict], pd.DataFrame]):
@@ -76,17 +86,15 @@ class AbilityTransformation:
         try:
             col_to_drop = ["generation", "names", "pokemon", "effect_changes"]
             validate_columns(
-                df, 
-                col_to_drop, 
-                context='drop',
-                caller_frame=inspect.currentframe())
+                df, col_to_drop, context="drop", caller_frame=inspect.currentframe()
+            )
 
-            df['short_effect_en'] = df['effect_entries'].apply(get_short_effect_en)
-            df = df.drop(columns=["generation", "names", "pokemon", "effect_changes", "effect_entries"])
+            df["short_effect_en"] = df["effect_entries"].apply(get_short_effect_en)
+            df = df.drop(columns=col_to_drop)
 
         except ValueError as e:
             print(e)
-            
+
         return df
 
     def gold(self):
@@ -94,6 +102,7 @@ class AbilityTransformation:
             columns={"id": "ability_id"}
         )
         return df
+
 
 class PokemonTransformation:
     def __init__(self, data: Union[List[dict], pd.DataFrame]):
@@ -108,12 +117,14 @@ class PokemonTransformation:
         try:
             col_to_drop = ["cries", "game_indices"]
             validate_columns(
-                pokemon_df, 
-                col_to_drop, 
-                context='drop',
-                caller_frame=inspect.currentframe())
+                pokemon_df,
+                col_to_drop,
+                context="drop",
+                caller_frame=inspect.currentframe(),
+            )
 
-            pokemon_df = pokemon_df.drop(columns=["cries", "game_indices"])
+            pokemon_df = pokemon_df.drop(columns=col_to_drop)
+            pokemon_df['species'] = pokemon_df['species'].apply(lambda x: get_dict_key(x, 'url'))
         except ValueError as e:
             print(e)
         pokemon_moves = []
@@ -122,63 +133,116 @@ class PokemonTransformation:
         pokemon_stats = []
 
         for _, row in pokemon_df.iterrows():
-            pokemon_id = row['id']
-            types = json.loads(row['types']) if isinstance(row['types'], str) else row['types']
-            moves = json.loads(row['moves']) if isinstance(row['moves'], str) else row['moves']
-            abilities = json.loads(row['abilities'] if isinstance(row['abilities'], str) else row['abilities'])
-            stats = json.loads(row['stats'] if isinstance(row['stats'], str) else row['stats'])
+            pokemon_id = row["id"]
+            types = (
+                json.loads(row["types"])
+                if isinstance(row["types"], str)
+                else row["types"]
+            )
+            moves = (
+                json.loads(row["moves"])
+                if isinstance(row["moves"], str)
+                else row["moves"]
+            )
+            abilities = json.loads(
+                row["abilities"]
+                if isinstance(row["abilities"], str)
+                else row["abilities"]
+            )
+            stats = json.loads(
+                row["stats"] if isinstance(row["stats"], str) else row["stats"]
+            )
 
             for type in types:
-                type_url = type['type']['url']
-                type_id = type_url.split('/')[-2]
-                pokemon_types.append({
-                    'pokemon_id': pokemon_id,
-                    'type_id': type_id
-                })
+                type_url = type["type"]["url"]
+                type_id = type_url.split("/")[-2]
+                slot = type["slot"]
+                pokemon_types.append(
+                    {"pokemon_id": pokemon_id, "type_id": type_id, "slot": slot}
+                )
 
             for move in moves:
-                move_url = move['move']['url']
-                move_id = move_url.split('/')[-2]
-                pokemon_moves.append({
-                    'pokemon_id': pokemon_id,
-                    'move_id': move_id
-                })
+                move_url = move["move"]["url"]
+                move_id = move_url.split("/")[-2]
+                pokemon_moves.append({"pokemon_id": pokemon_id, "move_id": move_id})
 
             for ability in abilities:
-                ability_url = ability['ability']['url']
-                ability_id = ability_url.split('/')[-2]
-                pokemon_abilities.append({
-                    'pokemon_id': pokemon_id,
-                    'ability_id': ability_id
-                })
+                ability_url = ability["ability"]["url"]
+                ability_id = ability_url.split("/")[-2]
+                pokemon_abilities.append(
+                    {"pokemon_id": pokemon_id, "ability_id": ability_id}
+                )
 
             for stat in stats:
-                stat_name = stat['stat']['name']
-                base_stat = stat['base_stat']
-                effort = stat['effort']
-                pokemon_stats.append({
-                    'pokemon_id': pokemon_id,
-                    'stat_name': stat_name,
-                    'base_stat' : base_stat,
-                    'effort' : effort,
-                })
+                stat_name = stat["stat"]["name"].replace("-", "_")
+                base_stat = stat["base_stat"]
+                effort = stat["effort"]
+                pokemon_stats.append(
+                    {
+                        "pokemon_id": pokemon_id,
+                        "stat_name": stat_name,
+                        "base_stat": base_stat,
+                        "effort": effort,
+                    }
+                )
 
-            
-        pokemon_df = pokemon_df.drop(columns=['types', 'moves', 'abilities'])
+        pokemon_df = pokemon_df.drop(columns=["types", "moves", "abilities"])
 
         pokemon_types_df = pd.DataFrame(pokemon_types)
         pokemon_moves_df = pd.DataFrame(pokemon_moves)
         pokemon_abilities_df = pd.DataFrame(pokemon_abilities)
         pokemon_stats_df = pd.DataFrame(pokemon_stats)
 
-        yield 'pokemon', pokemon_df
-        yield 'pokemon_types', pokemon_types_df
-        yield 'pokemon_moves', pokemon_moves_df
-        yield 'pokemon_abilities', pokemon_abilities_df
-        yield 'pokemon_stats', pokemon_stats_df
+        yield "pokemon", pokemon_df
+        yield "pokemon_types", pokemon_types_df
+        yield "pokemon_moves", pokemon_moves_df
+        yield "pokemon_abilities", pokemon_abilities_df
+        yield "pokemon_stats", pokemon_stats_df
 
     def gold(self):
         df = self.data.drop(columns=["created_at", "updated_at"]).rename(
             columns={"id": "pokemon_id"}
+        )
+        return df
+
+
+class PokemonSpeciesTransformation:
+    def __init__(self, data: Union[List[dict], pd.DataFrame]):
+        self.data = data
+
+    def bronze(self):
+        df = create_dataframe(self.data)
+        return df
+
+    def silver(self):
+        df = add_timestamp(self.data)
+        try:
+            col_to_drop = [
+                "color",
+                "egg_groups",
+                "evolution_chain",
+                "evolves_from_species",
+                "forms_switchable",
+                "growth_rate",
+                "habitat",
+                "shape",
+                "varieties",
+            ]
+            validate_columns(
+                df, col_to_drop, context="drop", caller_frame=inspect.currentframe()
+            )
+
+            # df["short_effect_en"] = df["effect_entries"].apply(get_short_effect_en)
+            df['generation'] = df['generation'].apply(lambda x: get_dict_key(x, 'url'))
+            df = df.drop(columns=col_to_drop)
+
+        except ValueError as e:
+            print(e)
+
+        return df
+
+    def gold(self):
+        df = self.data.drop(columns=["created_at", "updated_at"]).rename(
+            columns={"id": "ability_id"}
         )
         return df

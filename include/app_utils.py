@@ -65,6 +65,55 @@ def get_short_effect_en(effect_entries_string:str):
                 return entry.get('short_effect')
     except (json.JSONDecodeError, TypeError):
         return None
+    
+def get_dict_key(json_string:str, key_name:str):
+    try:
+        data_dict = json.loads(json_string)
+        dict_key = data_dict.get(key_name)
+        if not dict_key:
+            return
+        if key_name == 'url':
+            return dict_key.split('/')[-2]
+        else:
+            return dict_key
+    except (json.JSONDecodeError, TypeError):
+        return None
+    
+def get_generation(generation_string:str):
+    try:
+        generation = json.loads(generation_string)
+        url_string = generation.get('url')
+        if not url_string:
+            return
+        id = generation.get('url').split('/')[-2]
+        return id
+    
+    except (json.JSONDecodeError, TypeError):
+        return None
+    
+def get_type(type_string:str):
+    try:
+        type = json.loads(type_string)
+        name_string = type.get('name')
+        if not name_string:
+            return
+        name = type.get('name')
+        return name
+    
+    except (json.JSONDecodeError, TypeError):
+        return None
+    
+def get_species(species_string:str):
+    try:
+        species = json.loads(species_string)
+        url_string = species.get('url')
+        if not url_string:
+            return
+        id = species.get('url').split('/')[-2]
+        return id
+    
+    except (json.JSONDecodeError, TypeError):
+        return None
 
 def validate_columns(
     data: DataFrame, 

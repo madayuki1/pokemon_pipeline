@@ -24,3 +24,9 @@ bronze_etl_plan:
     call_mode: "batch"
     batch_size: 300
     dependencies: ["ability"]
+  pokemon_species:
+    endpoint: "https://pokeapi.co/api/v2/pokemon-species"
+    class: "PokemonSpecies"
+    call_mode: "batch"
+    batch_size: 300
+    dependencies: ["pokemon"]

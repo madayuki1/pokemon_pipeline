@@ -18,6 +18,7 @@ dag_owner = 'madayuki'
 current_path = Path(__file__).resolve()
 root_path = current_path.parents[3]
 data_path = root_path / 'shared' / 'poke_api'
+sql_path = current_path.parents[1] / 'include' / 'sql'
 
 default_args = {
         'owner': dag_owner,
@@ -49,7 +50,7 @@ def pokeapi_pipeline():
         bronze_loader = DataLoader(data_path, 'bronze')
         
         def single_call(endpoint, dataclass_instance):
-            data = ApiRequest(endpoint).extractData(data_path, dataclass_instance)
+            data = ApiRequest(endpoint).extractData(data_path, table_name, dataclass_instance)
             transformation_class = get_class(f'{dataclass_instance.__name__}Transformation', 'transform')
             transformed_data = transformation_class(data).bronze()
             bronze_loader.save_parquet(transformed_data, table_name)
@@ -59,7 +60,7 @@ def pokeapi_pipeline():
 
             print(f"Starting batch call for {endpoint}.")
             while True:
-                batch_data = ApiRequest(endpoint).extractData(data_path, dataclass_instance, offset=offset, limit=batch_size)
+                batch_data = ApiRequest(endpoint).extractData(data_path, table_name, dataclass_instance, offset=offset, limit=batch_size)
 
                 if not batch_data:
                     print("No more data found. Ending batch.")
@@ -86,33 +87,46 @@ def pokeapi_pipeline():
 
         return extract_data()
 
-    def transform_and_load_silver_data(table_name, class_name: str, return_multiple: bool = False):
+    def transform_and_load_silver_data(mode:str, table_name:str, config_dict: dict):
         bronze_loader = DataLoader(data_path, 'bronze')
         silver_loader = DataLoader(data_path, 'silver')
+        con = duckdb.connect(data_path / 'silver.duckdb')
 
         @task(task_id = f'Transform_{table_name}')
         def transform_data():
-            bronze_data = bronze_loader.read_parquet(table_name)
-            transformation_class = get_class(f'{class_name}Transformation', 'transform')
-            if return_multiple:
-                for name, df in transformation_class(bronze_data).silver():
-                    silver_loader.save_parquet(df, name, filename=name)
+            if mode == 'process_bronze':
+                bronze_data = bronze_loader.read_parquet(table_name)
+                transformation_class = get_class(f'{config_dict.get('class')}Transformation', 'transform')
+                if config_dict.get('return_multiple'):
+                    for name, df in transformation_class(bronze_data).silver():
+                        silver_loader.save_parquet(df, name, filename=name)
+                else:
+                    silver_data = transformation_class(bronze_data).silver()    
+                    silver_loader.save_parquet(silver_data, table_name, filename=table_name)
             else:
-                silver_data = transformation_class(bronze_data).silver()    
+                # Read the SQL file content as string
+                sql_str = (sql_path / f'{table_name}.sql').read_text() 
+
+                jinja_params = {
+                    'bronze_path' : str(data_path / 'bronze'),
+                    'silver_path' : str(data_path / 'silver'),
+                    'gold_path' : str(data_path / 'gold')
+                }
+                query = Template(sql_str).render(**jinja_params)
+                silver_data = con.execute(query).fetchdf()
                 silver_loader.save_parquet(silver_data, table_name, filename=table_name)
+
 
         return transform_data()
 
-    def transform_and_load_gold_data(table_name, query_path: str = ''):
+    def transform_and_load_gold_data(table_name):
         gold_loader = DataLoader(data_path, 'gold')
         con = duckdb.connect(data_path / 'gold.duckdb')
 
         @task(task_id=f'Transform_{table_name}')
         def transform_data():
-            
-            sql_path = current_path.parents[1] / query_path
             # Read the SQL file content as string
-            sql_str = sql_path.read_text() 
+            sql_str = (sql_path / f'{table_name}.sql').read_text() 
 
             jinja_params = {
                 'bronze_path' : str(data_path / 'bronze'),
@@ -148,28 +162,26 @@ def pokeapi_pipeline():
 
     with TaskGroup('Silver_Layer') as silver_group:
         silver_config = yaml.safe_load(
-            get_config('silver_etl_plan.yml').read_text())['silver_etl_plan']
-        for name, params in silver_config.items():
-            tasks[name] = transform_and_load_silver_data(
-                table_name = name,
-                class_name=params['class'],
-                return_multiple=params['return_multiple']
-            )
-        for name, params in silver_config.items():
-            for dependencies in params.get('dependencies', []):
-                if dependencies not in tasks:
-                    continue
-                tasks[dependencies] >> tasks[name]
-    
+            get_config('silver_etl_plan.yml').read_text())
+        for mode, config_group in silver_config.items():
+            for name, params in config_group.items():
+                tasks[name] = transform_and_load_silver_data(
+                    mode = mode,
+                    table_name=name,
+                    config_dict = params
+                )
+                for dependencies in params.get('dependencies', []):
+                    if dependencies not in tasks:
+                        continue
+                    tasks[dependencies] >> tasks[name]
+
     with TaskGroup('Gold_Layer') as gold_group:
         gold_config = yaml.safe_load(
             get_config('gold_etl_plan.yml').read_text())['gold_etl_plan']
         for name, params in gold_config.items():
             tasks[name] = transform_and_load_gold_data(
-                table_name=name,
-                query_path= current_path.parents[1] / params['query_path']
+                table_name=name
             )
-        for name, params in gold_config.items():
             for dependencies in params.get('dependencies', []):
                 if dependencies not in tasks:
                     continue

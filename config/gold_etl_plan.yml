@@ -1,4 +1,11 @@
 gold_etl_plan:
-    pokemon_types:
-        query_path: 'include/sql/pokemon_types.sql'
+    type_combo_distribution:
         dependencies: []
+    generation_stats:
+        dependencies: ['type_combo_distribution']
+    legendary_vs_normal_stats:
+        dependencies: ['generation_stats']
+    capture_rate_by_generation:
+        dependencies: ['legendary_vs_normal_stats']
+    move_burst_vs_spam_type:
+        dependencies: ['capture_rate_by_generation']

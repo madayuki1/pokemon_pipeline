@@ -1,4 +1,4 @@
-silver_etl_plan:
+process_bronze:
     type:
         class: "Type"
         return_multiple: False
@@ -15,3 +15,18 @@ silver_etl_plan:
         class: "Pokemon"
         return_multiple: True
         dependencies: ["ability"]
+    pokemon_species:
+        class: "PokemonSpecies"
+        return_multiple: False
+        dependencies: ["pokemon"]
+process_silver:
+    pokemon_stats_flattened:
+        dependencies: ["pokemon_species"]
+    pokemon_moves_summary:
+        dependencies: ["pokemon_stats_flattened"]
+    pokemon_abilities_summary:
+        dependencies: ["pokemon_moves_summary"]
+    type_combo:
+        dependencies: ["pokemon_abilities_summary"]
+    pokemon_master:
+        dependencies: ["type_combo"]

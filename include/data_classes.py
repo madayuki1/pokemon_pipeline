@@ -5,7 +5,7 @@ from typing import List
 class Pokemon:
     id: int
     name: str
-    is_default: bool
+    is_default: str = "-"
     location_area_encounters: str = "-"
     base_experience: int = -1
     height: int = -1
@@ -21,6 +21,30 @@ class Pokemon:
     stats: str = "-"
     types: str = "-"
     sprites: str = "-"
+
+@dataclass
+class PokemonSpecies:
+    id: int
+    name: str
+    order: int = -1
+    base_happiness: int = -1
+    capture_rate: int = -1
+    color: str = "-"
+    evolution_chain: str = "-"
+    egg_groups: str = "-"
+    evolves_from_species: int = -1
+    forms_switchable: str = "-"
+    gender_rate: int = -1
+    growth_rate: str = "-"
+    habitat: str = "-"
+    has_gender_differences: str = "-"
+    hatch_counter: int = 0
+    is_baby: str = "-"
+    is_legendary: str = "-"
+    is_mythical: str = "-"
+    shape: str = "-"
+    varieties: str = "-"
+    generation: str = "-"
 
 @dataclass
 class Type:
@@ -39,7 +63,7 @@ class Type:
 class Ability:
     id: int
     name: str
-    is_main_series: bool
+    is_main_series: str = "-"
     generation: str = "-"
     names: str = "-"
     pokemon: str = "-"

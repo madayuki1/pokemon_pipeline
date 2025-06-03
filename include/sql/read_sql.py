@@ -19,3 +19,6 @@ con = duckdb.connect()
 query = Template(sql_path).render(**jinja_params)
 df = con.execute(query).fetchdf()
 print(df)
+# TODO pokemon type per generation
+# TODO which type is easiest to catch
+# TODO pokemon height or weight correlation

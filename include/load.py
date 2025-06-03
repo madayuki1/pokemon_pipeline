@@ -1,6 +1,5 @@
 import pandas as pd
 import os
-import duckdb
 import glob
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -17,7 +16,7 @@ class DataLoader:
         
         now = datetime.now(ZoneInfo("Asia/Singapore"))
         if filename == '':
-            filename = f'{table_name}_{now.strftime("%Y-%m-%d__%H-%M-%S")}.parquet'
+            filename = f'{table_name}__{now.strftime("%Y-%m-%d__%H-%M-%S")}.parquet'
         else:
             filename = f'{filename}.parquet'
 
@@ -28,7 +27,7 @@ class DataLoader:
         df.to_parquet(file_path, index=False, compression='snappy')
 
     def read_parquet(self, table_name) -> pd.DataFrame:
-        pattern = Path(self.path) / self.layer / f'{table_name}*.parquet'
+        pattern = Path(self.path) / self.layer / f'{table_name}__*.parquet'
         parquet_files = glob.glob(str(pattern))
 
         if not parquet_files:

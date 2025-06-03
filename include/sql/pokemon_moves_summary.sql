@@ -5,8 +5,8 @@ SELECT
     m.accuracy,
     m.pp,
     m.priority,
-    JSON_EXTRACT(m.damage_class, '$.name') as damage_class,
-    JSON_EXTRACT(m.type, '$.name') as move_type
+    m.damage_class,
+    m.type,
 FROM 
     '{{silver_path}}/pokemon_moves.parquet' pm
 JOIN
