@@ -1,8 +1,7 @@
 SELECT
     pm.pokemon_id,
     pm.pokemon_name,
-    pm.is_legendary,
-    pm.is_mythical,
+    pm.rarity,
     pm.hp,
     pm.attack,
     pm.defense,
@@ -14,5 +13,5 @@ SELECT
 FROM
     '{{ silver_path }}/pokemon_master.parquet' pm
 {# WHERE pokemon_name='garchomp' #}
-WHERE is_mythical='false'
+where rarity!='mythical'
 ORDER BY total_stats DESC

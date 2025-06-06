@@ -3,7 +3,7 @@ SELECT
     type_1,
     type_2,
     CASE
-        WHEN type_2 IS NULL THEN type_1 || '/None'
+        WHEN type_2 IS NULL THEN type_1
         WHEN type_1 < type_2 THEN type_1 || '/' || type_2
         ELSE type_2 || '/' || type_1
     END AS type_combo,

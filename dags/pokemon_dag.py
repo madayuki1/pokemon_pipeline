@@ -139,6 +139,16 @@ def pokeapi_pipeline():
             gold_loader.save_parquet(gold_data, table_name, filename=table_name)
         return transform_data()
 
+    def generate_visualization(viz_name: str):
+        @task(task_id = f'visualize_{viz_name}')
+        def visualize():
+            parquet_file = data_path / 'gold'
+            output_path = root_path / 'shared' / 'reports'
+            viz_class = get_class(f'{viz_name}_plot', 'visualization')
+            viz_class(parquet_file, output_path)
+
+        return visualize()
+
     with TaskGroup("Bronze_Layer") as bronze_group:
         
         bronze_config = yaml.safe_load(
@@ -186,12 +196,24 @@ def pokeapi_pipeline():
                 if dependencies not in tasks:
                     continue
                 tasks[dependencies] >> tasks[name]
+    with TaskGroup('Visualization') as viz_group:
+        gold_config = yaml.safe_load(
+            get_config('gold_etl_plan.yml').read_text())['gold_etl_plan']
+        for name, params in gold_config.items():
+            tasks[name] = generate_visualization(
+                viz_name=name
+            )
+            for dependencies in params.get('dependencies', []):
+                if dependencies not in tasks:
+                    continue
+                tasks[dependencies] >> tasks[name]
 
     (
         check_api_response()
         >> bronze_group
         >> silver_group
         >> gold_group
+        >> viz_group
     )
 
 pokeapi_pipeline()

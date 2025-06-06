@@ -10,3 +10,4 @@ FROM
     '{{ silver_path }}/pokemon_master.parquet'
 GROUP BY
     generation
+ORDER BY generation ASC

@@ -12,8 +12,11 @@ SELECT
     psf.special_attack,
     psf.special_defense, 
     psf.speed,
-    ps.is_legendary,
-    ps.is_mythical,
+    case
+        when is_legendary then 'legendary'
+        when is_mythical then 'mythical'
+        else 'normal'
+    end as rarity
 FROM
     '{{ silver_path }}/pokemon.parquet' p 
 JOIN '{{ silver_path }}/pokemon_species.parquet' ps ON p.species = ps.id
