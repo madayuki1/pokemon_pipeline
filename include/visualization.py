@@ -244,3 +244,35 @@ def move_burst_vs_spam_type_plot(parquet_path:str, output_path:str):
     plt.savefig(output_path / filename)
     plt.close()
 
+def ability_frequency_plot(parquet_path:str, output_path:str):
+    top_n = 6
+    # Check if parquet path exists
+    if not parquet_path.exists():
+        os.makedirs(parquet_path, exist_ok=True)
+    
+    if not output_path.exists():
+        os.makedirs(output_path, exist_ok=True)
+
+    # Load data
+    filename = 'ability_frequency'
+    df = pd.read_parquet(parquet_path / f'{filename}.parquet')
+
+    df_sorted = df.sort_values(by="count", ascending=False).head(10)
+    top_abilities = df_sorted.head(top_n).copy()
+
+    # Plot
+    plt.figure(figsize=(8, 8))
+    plt.pie(
+        top_abilities["count"],
+        labels=top_abilities["ability_name"],
+        autopct='%1.1f%%',
+        startangle=140,
+        wedgeprops={"edgecolor": "white"}
+    )
+    plt.title("Top Pokemon Abilities")
+
+    # Save
+    output_path.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_path / "ability_pie_chart.png")
+    plt.close()
+

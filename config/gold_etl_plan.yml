@@ -9,3 +9,5 @@ gold_etl_plan:
         dependencies: ['legendary_vs_normal_stats']
     move_burst_vs_spam_type:
         dependencies: ['capture_rate_by_generation']
+    ability_frequency:
+        dependencies: ['move_burst_vs_spam_type']

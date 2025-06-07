@@ -29,7 +29,7 @@ x-airflow-common:
     # If you want to use it, outcomment it and replace airflow.cfg with the name of your config file
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
   volumes:
-    - ${AIRFLOW_PROJ_DIR:-.}/shared:/shared
+    - ${AIRFLOW_PROJ_DIR:-.}/data:/data
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
@@ -224,7 +224,7 @@ services:
   #     - "8081:8081"  # Spark Master UI
   #     - "7077:7077"  # Spark Master Port
   #   volumes:
-  #     - ./shared:/shared
+  #     - ./data:/data
   #     - ./include:/opt/airflow/include
   #     - ./apps:/opt/spark-apps
   #     - ./data:/opt/spark-data
@@ -256,7 +256,7 @@ services:
   #     - SPARK_INITSCRIPTS_DIR=/spark/entrypoint.sh
   #   volumes:
   #     - ./include:/opt/airflow/include
-  #     - ./shared:/shared
+  #     - ./data:/data
   #     - ./apps:/opt/spark-apps
   #     - ./data:/opt/spark-data
   #     - ./spark/entrypoint.sh:/entrypoint.sh

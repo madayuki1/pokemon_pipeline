@@ -8,9 +8,6 @@ from app_utils import (
     add_timestamp,
     validate_columns,
     get_short_effect_en,
-    get_generation,
-    get_species,
-    get_type,
     get_dict_key,
 )
 

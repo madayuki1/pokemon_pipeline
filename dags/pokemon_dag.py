@@ -17,7 +17,7 @@ from app_utils import get_config, get_class
 dag_owner = 'madayuki'
 current_path = Path(__file__).resolve()
 root_path = current_path.parents[3]
-data_path = root_path / 'shared' / 'poke_api'
+data_path = root_path / 'data' / 'poke_api'
 sql_path = current_path.parents[1] / 'include' / 'sql'
 
 default_args = {
@@ -143,7 +143,7 @@ def pokeapi_pipeline():
         @task(task_id = f'visualize_{viz_name}')
         def visualize():
             parquet_file = data_path / 'gold'
-            output_path = root_path / 'shared' / 'reports'
+            output_path = root_path / 'data' / 'reports'
             viz_class = get_class(f'{viz_name}_plot', 'visualization')
             viz_class(parquet_file, output_path)
 
