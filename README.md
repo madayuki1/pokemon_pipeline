@@ -36,3 +36,9 @@ docker-compose up --build
 
 # 4. Find Parquet outputs under data/{bronze,silver,gold}/
 #    and charts under data/reports
+```
+
+Future Improvements
+- Add unit tests for transform functions
+- Enable S3 or cloud warehouse compatibility
+- Migrate transformations to dbt
