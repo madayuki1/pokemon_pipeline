@@ -24,7 +24,7 @@ How to Run
 ```bash
 # 1. Clone repo
 git clone https://github.com/madayuki1/pokemon_pipeline.git
-cd pokeapi-etl
+cd pokemon-pipeline
 
 # 2. Build & start services
 docker-compose up --build
